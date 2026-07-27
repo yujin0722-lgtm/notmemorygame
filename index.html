@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="散らばったカードを特殊フリップでめくる、ローグライト型の神経衰弱プロトタイプ" />
+  <title>NOT MEMORY GAME — 新規衰弱プロトタイプ</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <p class="eyebrow">MEMORY ROGUELITE PROTOTYPE</p>
+        <h1>NOT MEMORY GAME</h1>
+      </div>
+
+      <section class="stats" aria-label="ゲーム状況">
+        <div class="stat"><span>ROUND</span><strong id="roundValue">1</strong></div>
+        <div class="stat"><span>TURN</span><strong id="turnValue">1</strong></div>
+        <div class="stat"><span>LIFE</span><strong id="lifeValue">5</strong></div>
+        <div class="stat"><span>SCORE</span><strong id="scoreValue">0</strong></div>
+      </section>
+    </header>
+
+    <section class="control-panel">
+      <div class="action-status">
+        <span class="phase-label" id="phaseLabel">ラウンド準備</span>
+        <strong id="actionPrompt">装備を確認して開始してください</strong>
+      </div>
+
+      <div class="loadout-summary" aria-label="現在のフリップ">
+        <div class="flip-slot" id="slot1Summary">
+          <span>FLIP 1</span>
+          <strong>通常フリップ</strong>
+        </div>
+        <div class="arrow">→</div>
+        <div class="flip-slot" id="slot2Summary">
+          <span>FLIP 2</span>
+          <strong>通常フリップ</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="round-setup-panel is-open" id="roundModal" role="region" aria-labelledby="roundModalTitle">
+      <div class="round-setup-copy">
+        <p class="eyebrow">ROUND SETUP</p>
+        <h2 id="roundModalTitle">ラウンド 1</h2>
+        <p id="roundModalText">2枚のカードが配置されました。</p>
+        <p class="setup-guide">下の盤面の散らばり方を見て、このラウンドで使う2つのフリップを選んでください。</p>
+      </div>
+
+      <div class="round-setup-controls">
+        <div class="loadout-editor">
+          <label>
+            <span>フリップ1</span>
+            <select id="slot1Select"></select>
+          </label>
+          <label>
+            <span>フリップ2</span>
+            <select id="slot2Select"></select>
+          </label>
+        </div>
+
+        <p class="hint">装備変更はラウンド開始時のみ可能です。カードの位置は開始後も変わりません。</p>
+        <button class="primary-button" id="startRoundButton" type="button">この装備で開始</button>
+      </div>
+    </section>
+
+    <section class="board-wrap">
+      <div class="board" id="board" aria-label="カード盤面">
+        <div class="power-preview" id="powerPreview" hidden></div>
+      </div>
+      <div class="toast" id="toast" aria-live="polite"></div>
+    </section>
+
+    <footer class="bottom-panel">
+      <div>
+        <span class="mini-label">OWNED SPECIAL FLIPS</span>
+        <div class="inventory" id="inventory"></div>
+      </div>
+      <button class="ghost-button" id="rulesButton" type="button">ルール</button>
+    </footer>
+  </main>
+
+
+
+  <div class="modal-backdrop" id="rewardModal" role="dialog" aria-modal="true" aria-labelledby="rewardTitle">
+    <section class="modal">
+      <p class="eyebrow">FLIP REWARD</p>
+      <h2 id="rewardTitle">特殊フリップを獲得</h2>
+      <p>新しい特殊フリップを1つ選んでください。</p>
+      <div class="reward-grid" id="rewardGrid"></div>
+      <button class="ghost-button modal-skip" id="skipRewardButton" type="button">今回は見送る</button>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="replaceModal" role="dialog" aria-modal="true" aria-labelledby="replaceTitle">
+    <section class="modal compact-modal">
+      <p class="eyebrow">INVENTORY FULL</p>
+      <h2 id="replaceTitle">所持上限です</h2>
+      <p>入れ替える特殊フリップを選んでください。</p>
+      <div class="replace-list" id="replaceList"></div>
+      <button class="ghost-button modal-skip" id="cancelReplaceButton" type="button">新しいフリップを諦める</button>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="gameOverModal" role="dialog" aria-modal="true" aria-labelledby="gameOverTitle">
+    <section class="modal compact-modal gameover-modal">
+      <p class="eyebrow">GAME OVER</p>
+      <h2 id="gameOverTitle">ライフが尽きました</h2>
+      <div class="result-grid">
+        <div><span>到達ラウンド</span><strong id="finalRound">1</strong></div>
+        <div><span>最終スコア</span><strong id="finalScore">0</strong></div>
+      </div>
+      <button class="primary-button" id="restartButton" type="button">もう一度遊ぶ</button>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="rulesModal" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <section class="modal rules-modal">
+      <p class="eyebrow">HOW TO PLAY</p>
+      <h2 id="rulesTitle">遊び方</h2>
+      <ol>
+        <li>1ターンに「フリップ1」「フリップ2」を順番に実行します。</li>
+        <li>2回のフリップ後、表向きの未処理カード全体を判定します。</li>
+        <li>ペアが1組以上あれば得点。複数ペアならボーナスです。</li>
+        <li>ペアがなければライフを1失います。0になれば即ゲームオーバーです。</li>
+        <li>ペアにならなかったカードは表向きのまま残ります。</li>
+        <li>裏向きカードが1枚以下になると、カードが1枚増えて次のラウンドへ進みます。</li>
+      </ol>
+      <button class="primary-button" id="closeRulesButton" type="button">閉じる</button>
+    </section>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
