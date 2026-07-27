@@ -239,7 +239,11 @@
 
     clearPreview();
     syncCardElements();
-    showToast(`${skill.name}: ${targets.length}枚公開`, 'success');
+    const consumed = consumeSpecialSkill(skillId);
+    showToast(
+      `${skill.name}: ${targets.length}枚公開${consumed ? '（使用済み）' : ''}`,
+      'success'
+    );
 
     state.actionIndex += 1;
     const remainingHidden = getHiddenCards().length;
@@ -251,6 +255,17 @@
     } else {
       updateUI();
     }
+  }
+
+  function consumeSpecialSkill(skillId) {
+    if (skillId === 'normal') return false;
+
+    const ownedIndex = state.ownedSkills.indexOf(skillId);
+    if (ownedIndex < 0) return false;
+
+    state.ownedSkills.splice(ownedIndex, 1);
+    state.equipped[state.actionIndex] = 'normal';
+    return true;
   }
 
   function determineTargets(selectedCard, skill) {
