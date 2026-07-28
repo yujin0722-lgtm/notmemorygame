@@ -100,6 +100,7 @@
         faceUp: false,
         matched: false,
         newlyFlipped: false,
+        lifeRewardClaimed: false,
         x: 0,
         y: 0,
         width: 70,
@@ -315,20 +316,43 @@
       matchedCards.push(...cards.slice(0, completePairs * 2));
     }
 
+    const unmatchedCards = faceUpCards.filter((card) => !matchedCards.includes(card));
+    const singletonSymbols = new Set(
+      state.cards
+        .filter((card) => state.cards.filter((other) => other.symbol === card.symbol).length === 1)
+        .map((card) => card.symbol)
+    );
+    const rewardedSingletons = unmatchedCards.filter((card) => (
+      card.newlyFlipped
+      && singletonSymbols.has(card.symbol)
+      && !card.lifeRewardClaimed
+    ));
+
+    rewardedSingletons.forEach((card) => { card.lifeRewardClaimed = true; });
+    let lifeReward = 0;
+
     if (pairCount > 0) {
       const earned = CONFIG.pairBaseScore * pairCount * pairCount;
       state.score += earned;
+      lifeReward = Math.min(rewardedSingletons.length, CONFIG.maxLives - state.lives);
+      state.lives += lifeReward;
       matchedCards.forEach((card) => { card.matched = true; });
       syncCardElements();
       showToast(
-        pairCount > 1 ? `${pairCount}ペア・コンボ！ +${earned}` : `1ペア！ +${earned}`,
+        `${pairCount > 1 ? `${pairCount}ペア・コンボ！ +${earned}` : `1ペア！ +${earned}`}${lifeReward > 0 ? ` / ボーナス +${lifeReward} LIFE` : ''}`,
         'success'
       );
     } else {
       state.lives -= 1;
-      showToast('ペアなし −1 LIFE', 'danger');
+      lifeReward = Math.min(rewardedSingletons.length, CONFIG.maxLives - state.lives);
+      state.lives += lifeReward;
+      showToast(
+        lifeReward > 0 ? `ペアなし −1 LIFE / ボーナス +${lifeReward} LIFE` : 'ペアなし −1 LIFE',
+        lifeReward > 0 ? 'success' : 'danger'
+      );
     }
 
+    unmatchedCards.forEach((card) => { card.faceUp = false; });
     state.cards.forEach((card) => { card.newlyFlipped = false; });
     updateUI();
 
