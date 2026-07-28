@@ -5,7 +5,8 @@
  * 数値やフリップ性能の多くは、このファイルだけで変更できます。
  */
 window.GAME_CONFIG = {
-  initialLives: 5,
+  initialLives: 20,
+  maxLives: 20,
   inventoryLimit: 4,
   rewardEveryRounds: 2,
   pairBaseScore: 100,
