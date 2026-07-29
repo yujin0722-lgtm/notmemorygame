@@ -4,6 +4,11 @@
   const CONFIG = window.GAME_CONFIG;
   const $ = (selector) => document.querySelector(selector);
 
+  const SUITS = ['spade', 'club', 'heart', 'diamond'];
+  const SUIT_ICONS = { spade: '♠', club: '♣', heart: '♥', diamond: '♦' };
+  const SUIT_COLORS = { spade: 'black', club: 'black', heart: 'red', diamond: 'red' };
+  const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
   const els = {
     board: $('#board'),
     powerPreview: $('#powerPreview'),
@@ -39,6 +44,11 @@
     finalScore: $('#finalScore'),
     restartButton: $('#restartButton'),
 
+    gameClearModal: $('#gameClearModal'),
+    clearFinalRound: $('#clearFinalRound'),
+    clearFinalScore: $('#clearFinalScore'),
+    restartFromClearButton: $('#restartFromClearButton'),
+
     rulesModal: $('#rulesModal'),
     rulesButton: $('#rulesButton'),
     closeRulesButton: $('#closeRulesButton'),
@@ -57,6 +67,8 @@
     equipped: ['normal', 'normal'],
     pendingRewardSkill: null,
     toastTimer: null,
+    deckSequence: [],
+    totalRounds: 0,
   };
 
   function resetGame() {
@@ -71,8 +83,39 @@
     state.ownedSkills = [];
     state.equipped = ['normal', 'normal'];
     state.pendingRewardSkill = null;
+    state.deckSequence = buildDeckSequence();
+    state.totalRounds = state.deckSequence.length;
     closeAllModals();
     prepareRound();
+  }
+
+  function buildDeckSequence() {
+    // 13ランク × (黒:♠♣ / 赤:♥♦) の26グループ、各2枚で52枚。
+    const groups = [];
+    RANKS.forEach((rank) => {
+      ['black', 'red'].forEach((colorKey) => {
+        const suitsForColor = SUITS.filter((suit) => SUIT_COLORS[suit] === colorKey);
+        groups.push(suitsForColor.map((suit) => ({ rank, suit, color: colorKey })));
+      });
+    });
+
+    // ラウンド1は必ずスペードのA・クラブのAから開始する。
+    const startIndex = groups.findIndex((group) => group[0].rank === 'A' && group[0].color === 'black');
+    const startGroup = groups.splice(startIndex, 1)[0];
+    shuffle(groups);
+
+    const drawOrder = [];
+    groups.forEach((group) => {
+      shuffle(group);
+      drawOrder.push(...group);
+    });
+
+    const perRound = Math.max(1, CONFIG.newCardsPerRound || 1);
+    const sequence = [[...startGroup]];
+    for (let i = 0; i < drawOrder.length; i += perRound) {
+      sequence.push(drawOrder.slice(i, i + perRound));
+    }
+    return sequence;
   }
 
   function prepareRound() {
@@ -83,37 +126,38 @@
     openModal(els.roundModal);
     // インラインの装備パネルを表示してから、残り領域にカードを配置します。
     void els.roundModal.offsetHeight;
+    const previousOnBoard = state.cards.filter((card) => !card.matched).length;
     buildDeck();
     renderBoard();
     populateLoadoutSelects();
-    els.roundModalTitle.textContent = `ラウンド ${state.round}`;
-    els.roundModalText.textContent = `${state.round + 1}枚のカードが配置されました。位置関係を確認できます。`;
+    const onBoard = state.cards.filter((card) => !card.matched).length;
+    const newCount = onBoard - previousOnBoard;
+    els.roundModalTitle.textContent = `ラウンド ${state.round} / ${state.totalRounds}`;
+    els.roundModalText.textContent =
+      `盤面に${onBoard}枚（今回+${newCount}枚）。使用済み ${state.cards.length} / 52 枚。`;
     updateUI();
   }
 
   function buildDeck() {
-    const count = state.round + 1;
-    const cards = [];
+    const newCardSpecs = state.deckSequence[state.round - 1] || [];
+    const newCards = newCardSpecs.map((spec) => ({
+      id: `r${state.round}-${spec.rank}${spec.suit}-${Math.random().toString(36).slice(2, 8)}`,
+      rank: spec.rank,
+      suit: spec.suit,
+      color: spec.color,
+      symbol: `${spec.rank}-${spec.color}`,
+      faceUp: false,
+      matched: false,
+      newlyFlipped: false,
+      lifeRewardClaimed: false,
+      x: 0,
+      y: 0,
+      width: 70,
+      height: 96,
+      rotation: 0,
+    }));
 
-    for (let i = 0; i < count; i += 1) {
-      const symbolIndex = Math.floor(i / 2);
-      cards.push({
-        id: `r${state.round}-c${i}-${Math.random().toString(36).slice(2, 8)}`,
-        symbol: CONFIG.symbols[symbolIndex] ?? String(symbolIndex + 1),
-        faceUp: false,
-        matched: false,
-        newlyFlipped: false,
-        lifeRewardClaimed: false,
-        x: 0,
-        y: 0,
-        width: 70,
-        height: 96,
-        rotation: 0,
-      });
-    }
-
-    shuffle(cards);
-    state.cards = cards;
+    state.cards.push(...newCards);
     assignScatteredLayout();
   }
 
@@ -121,7 +165,8 @@
     const rect = els.board.getBoundingClientRect();
     const boardWidth = Math.max(rect.width, 320);
     const boardHeight = Math.max(rect.height, 460);
-    const count = state.cards.length;
+    const cards = state.cards.filter((card) => !card.matched);
+    const count = cards.length;
     const area = boardWidth * boardHeight;
     const estimatedWidth = Math.sqrt(area / Math.max(count * 1.9, 1)) * 0.72;
     const cardWidth = clamp(
@@ -133,7 +178,7 @@
     const margin = Math.max(12, cardWidth * 0.12);
     const placed = [];
 
-    for (const card of state.cards) {
+    for (const card of cards) {
       let position = null;
       for (let attempt = 0; attempt < 700; attempt += 1) {
         const candidate = {
@@ -189,7 +234,7 @@
   function renderBoard() {
     els.board.querySelectorAll('.card').forEach((element) => element.remove());
 
-    state.cards.forEach((card, index) => {
+    state.cards.filter((card) => !card.matched).forEach((card, index) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'card';
@@ -205,7 +250,12 @@
       button.innerHTML = `
         <span class="card-inner">
           <span class="card-face card-back"></span>
-          <span class="card-face card-front"><span class="card-symbol">${escapeHtml(card.symbol)}</span></span>
+          <span class="card-face card-front card-suit-${card.color}">
+            <span class="card-symbol">
+              <span class="card-rank">${escapeHtml(card.rank)}</span>
+              <span class="card-suit-icon">${escapeHtml(SUIT_ICONS[card.suit])}</span>
+            </span>
+          </span>
         </span>
       `;
 
@@ -385,8 +435,21 @@
   }
 
   function advanceRound() {
+    if (state.round >= state.totalRounds) {
+      showGameClear();
+      return;
+    }
     state.round += 1;
     prepareRound();
+  }
+
+  function showGameClear() {
+    state.phase = 'gameclear';
+    clearPreview();
+    els.clearFinalRound.textContent = String(state.round);
+    els.clearFinalScore.textContent = String(state.score);
+    openModal(els.gameClearModal);
+    updateUI();
   }
 
   function showReward(options) {
@@ -562,7 +625,7 @@
       element.classList.toggle('is-newly-flipped', card.newlyFlipped);
       element.classList.toggle('is-disabled', state.phase !== 'action' || card.faceUp || card.matched);
       element.disabled = state.phase !== 'action' || card.faceUp || card.matched;
-      element.setAttribute('aria-label', card.faceUp ? `表向き: ${card.symbol}` : '裏向きのカード');
+      element.setAttribute('aria-label', card.faceUp ? `表向き: ${card.rank}${SUIT_ICONS[card.suit]}` : '裏向きのカード');
     });
   }
 
@@ -593,6 +656,9 @@
     } else if (state.phase === 'gameover') {
       els.phaseLabel.textContent = 'ゲームオーバー';
       els.actionPrompt.textContent = 'ライフが0になりました';
+    } else if (state.phase === 'gameclear') {
+      els.phaseLabel.textContent = 'ゲームクリア';
+      els.actionPrompt.textContent = '52枚のカードをすべて使い切りました';
     } else {
       els.phaseLabel.textContent = 'カード配置フェイズ';
       els.actionPrompt.textContent = '盤面の配置を見て、このラウンドの装備を選んでください';
@@ -702,6 +768,7 @@
     advanceRound();
   });
   els.restartButton.addEventListener('click', resetGame);
+  els.restartFromClearButton.addEventListener('click', resetGame);
   els.rulesButton.addEventListener('click', () => openModal(els.rulesModal));
   els.closeRulesButton.addEventListener('click', () => closeModal(els.rulesModal));
 
@@ -711,5 +778,5 @@
     renderBoard();
   });
 
-  prepareRound();
+  resetGame();
 })();
