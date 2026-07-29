@@ -118,18 +118,33 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="gameClearModal" role="dialog" aria-modal="true" aria-labelledby="gameClearTitle">
+    <section class="modal compact-modal gameover-modal">
+      <p class="eyebrow">GAME CLEAR</p>
+      <h2 id="gameClearTitle">52枚をすべて使い切りました</h2>
+      <div class="result-grid">
+        <div><span>到達ラウンド</span><strong id="clearFinalRound">1</strong></div>
+        <div><span>最終スコア</span><strong id="clearFinalScore">0</strong></div>
+      </div>
+      <button class="primary-button" id="restartFromClearButton" type="button">もう一度遊ぶ</button>
+    </section>
+  </div>
+
   <div class="modal-backdrop" id="rulesModal" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
     <section class="modal rules-modal">
       <p class="eyebrow">HOW TO PLAY</p>
       <h2 id="rulesTitle">遊び方</h2>
       <ol>
+        <li>実際のトランプ52枚を使用します。ラウンド1はスペードのA・クラブのAから始まります。</li>
+        <li>以降は毎ラウンド新しいカードが1枚ずつ追加されます。同じ数字・同じ色（黒:♠♣ / 赤:♥♦）のカードがそろうとペアです。</li>
         <li>1ターンに「フリップ1」「フリップ2」を順番に実行します。</li>
         <li>2回のフリップ後、表向きの未処理カード全体を判定します。</li>
         <li>ペアが1組以上あれば得点。複数ペアならボーナスです。</li>
-        <li>ペアにならなかったカードは、判定後に裏向きへ戻ります。</li>
-        <li>ペアがなければライフを1失います。奇数枚のラウンドでペアのないカードを初めてめくると、最大20までライフを1獲得します。</li>
+        <li>ペアにならなかったカードは、判定後に裏向きへ戻り、相方が出るまで盤面に残り続けます。</li>
+        <li>ペアがなければライフを1失います。盤面にまだ相方がいないカードを初めてめくると、最大20までライフを1獲得します。</li>
         <li>ライフが0になれば即ゲームオーバーです。</li>
-        <li>裏向きカードが1枚以下になると、カードが1枚増えて次のラウンドへ進みます。</li>
+        <li>裏向きカードが1枚以下になると、カードが追加されて次のラウンドへ進みます。</li>
+        <li>52枚をすべて使い切るとゲームクリアです。</li>
         <li>毎ターン3エネルギーまで使えます。エネルギーは次のターンに全回復します。</li>
         <li>特殊フリップは共通のエネルギーを消費します（ダブル1、ラッキーストライク2、パワーアタック3）。獲得した特殊フリップはなくなりません。</li>
       </ol>

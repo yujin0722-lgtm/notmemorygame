@@ -246,15 +246,25 @@ button { cursor: pointer; }
   text-shadow: 0 1px 0 white;
 }
 .card-symbol {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
-  place-items: center;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-  font-size: clamp(1.7rem, 4.2vw, 3.2rem);
   line-height: 1;
   transform: translateZ(1px);
 }
+.card-rank {
+  font-size: clamp(1rem, 2.6vw, 1.55rem);
+  font-weight: 800;
+}
+.card-suit-icon {
+  margin-top: 2px;
+  font-size: clamp(1.6rem, 4vw, 2.9rem);
+}
+.card-front.card-suit-red { color: #b3261e; }
+.card-front.card-suit-black { color: #141821; }
 .card:not(.is-face-up):not(.is-disabled):hover {
   filter: brightness(1.17);
   z-index: 30 !important;
