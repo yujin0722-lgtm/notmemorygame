@@ -11,6 +11,7 @@
     roundValue: $('#roundValue'),
     turnValue: $('#turnValue'),
     lifeValue: $('#lifeValue'),
+    energyValue: $('#energyValue'),
     scoreValue: $('#scoreValue'),
     phaseLabel: $('#phaseLabel'),
     actionPrompt: $('#actionPrompt'),
@@ -48,6 +49,7 @@
     turn: 1,
     lives: CONFIG.initialLives,
     score: 0,
+    energy: CONFIG.maxEnergy,
     cards: [],
     phase: 'roundSetup',
     actionIndex: 0,
@@ -62,6 +64,7 @@
     state.turn = 1;
     state.lives = CONFIG.initialLives;
     state.score = 0;
+    state.energy = CONFIG.maxEnergy;
     state.cards = [];
     state.phase = 'roundSetup';
     state.actionIndex = 0;
@@ -224,13 +227,11 @@
     const skill = CONFIG.skills[skillId];
     if (!skill) return;
 
-    if (skill.lifeCost > 0) {
-      if (state.lives <= skill.lifeCost) {
-        showToast('ライフが足りません', 'danger');
-        return;
-      }
-      state.lives -= skill.lifeCost;
+    if (state.energy < skill.energyCost) {
+      showToast('エネルギーが足りません', 'danger');
+      return;
     }
+    state.energy -= skill.energyCost;
 
     const targets = determineTargets(card, skill);
     targets.forEach((target) => {
@@ -240,9 +241,8 @@
 
     clearPreview();
     syncCardElements();
-    const consumed = consumeSpecialSkill(skillId);
     showToast(
-      `${skill.name}: ${targets.length}枚公開${consumed ? '（使用済み）' : ''}`,
+      `${skill.name}: ${targets.length}枚公開${skill.energyCost > 0 ? `（−${skill.energyCost} ENERGY）` : ''}`,
       'success'
     );
 
@@ -256,17 +256,6 @@
     } else {
       updateUI();
     }
-  }
-
-  function consumeSpecialSkill(skillId) {
-    if (skillId === 'normal') return false;
-
-    const ownedIndex = state.ownedSkills.indexOf(skillId);
-    if (ownedIndex < 0) return false;
-
-    state.ownedSkills.splice(ownedIndex, 1);
-    state.equipped[state.actionIndex] = 'normal';
-    return true;
   }
 
   function determineTargets(selectedCard, skill) {
@@ -368,6 +357,7 @@
       } else {
         state.turn += 1;
         state.actionIndex = 0;
+        state.energy = CONFIG.maxEnergy;
         state.phase = 'action';
         syncCardElements();
         updateUI();
@@ -472,7 +462,8 @@
       options.forEach((skillId) => {
         const option = document.createElement('option');
         option.value = skillId;
-        option.textContent = CONFIG.skills[skillId].name;
+        const energyCost = CONFIG.skills[skillId].energyCost;
+        option.textContent = `${CONFIG.skills[skillId].name}（ENERGY ${energyCost}）`;
         option.selected = state.equipped[slotIndex] === skillId;
         select.appendChild(option);
       });
@@ -489,13 +480,26 @@
       else els.slot1Select.value = 'normal';
     }
 
+    const totalCost = CONFIG.skills[els.slot1Select.value].energyCost
+      + CONFIG.skills[els.slot2Select.value].energyCost;
+    if (totalCost > CONFIG.maxEnergy) {
+      if (changedSlot === 0) els.slot2Select.value = 'normal';
+      else els.slot1Select.value = 'normal';
+    }
+
     const selected1 = els.slot1Select.value;
     const selected2 = els.slot2Select.value;
     [...els.slot1Select.options].forEach((option) => {
-      option.disabled = option.value !== 'normal' && option.value === selected2;
+      option.disabled = option.value !== 'normal' && (
+        option.value === selected2
+        || CONFIG.skills[option.value].energyCost + CONFIG.skills[selected2].energyCost > CONFIG.maxEnergy
+      );
     });
     [...els.slot2Select.options].forEach((option) => {
-      option.disabled = option.value !== 'normal' && option.value === selected1;
+      option.disabled = option.value !== 'normal' && (
+        option.value === selected1
+        || CONFIG.skills[option.value].energyCost + CONFIG.skills[selected1].energyCost > CONFIG.maxEnergy
+      );
     });
   }
 
@@ -504,6 +508,7 @@
     state.equipped = [els.slot1Select.value, els.slot2Select.value];
     state.phase = 'action';
     state.actionIndex = 0;
+    state.energy = CONFIG.maxEnergy;
     closeModal(els.roundModal);
     updateUI();
   }
@@ -565,6 +570,7 @@
     els.roundValue.textContent = String(state.round);
     els.turnValue.textContent = String(state.turn);
     els.lifeValue.textContent = String(state.lives);
+    els.energyValue.textContent = `${state.energy} / ${CONFIG.maxEnergy}`;
     els.scoreValue.textContent = String(state.score);
 
     const skill1 = CONFIG.skills[state.equipped[0]];
