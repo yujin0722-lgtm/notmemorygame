@@ -23,6 +23,8 @@
     slot1Summary: $('#slot1Summary'),
     slot2Summary: $('#slot2Summary'),
     inventory: $('#inventory'),
+    passButton: $('#passButton'),
+    comboValue: $('#comboValue'),
 
     roundModal: $('#roundModal'),
     roundModalTitle: $('#roundModalTitle'),
@@ -70,6 +72,7 @@
     deckSequence: [],
     totalRounds: 0,
     claimedSingletons: new Set(),
+    combo: 0,
   };
 
   function resetGame() {
@@ -87,6 +90,7 @@
     state.deckSequence = buildDeckSequence();
     state.totalRounds = state.deckSequence.length - 1;
     state.claimedSingletons = new Set();
+    state.combo = 0;
     closeAllModals();
     prepareRound();
   }
@@ -264,7 +268,42 @@
     syncCardElements();
   }
 
+  function handlePassClick() {
+    if (state.phase !== 'action' || state.actionIndex !== 0) return;
+    if (state.lives <= CONFIG.passLifeCost) {
+      showToast('ライフが足りないため様子見できません', 'danger');
+      return;
+    }
+    state.lives -= CONFIG.passLifeCost;
+    state.phase = 'peeking';
+    clearPreview();
+    updateUI();
+  }
+
+  function handlePeekClick(cardId) {
+    const card = getCard(cardId);
+    if (!card || card.faceUp || card.matched) return;
+
+    card.faceUp = true;
+    syncCardElements();
+    showToast(`様子見: ${card.rank}${SUIT_ICONS[card.suit]}を確認しました（−${CONFIG.passLifeCost} LIFE）`, 'danger');
+
+    window.setTimeout(() => {
+      card.faceUp = false;
+      state.phase = 'action';
+      state.turn += 1;
+      state.actionIndex = 0;
+      state.energy = CONFIG.maxEnergy;
+      syncCardElements();
+      updateUI();
+    }, CONFIG.resultDelayMs);
+  }
+
   function handleCardClick(cardId) {
+    if (state.phase === 'peeking') {
+      handlePeekClick(cardId);
+      return;
+    }
     if (state.phase !== 'action') return;
     const card = getCard(cardId);
     if (!card || card.faceUp || card.matched) return;
@@ -369,15 +408,19 @@
     if (pairCount > 0) {
       const earned = CONFIG.pairBaseScore * pairCount * pairCount;
       state.score += earned;
+      state.combo += 1;
+      const comboRecovery = Math.min(state.combo, CONFIG.maxLives - state.lives);
+      state.lives += comboRecovery;
       lifeReward = Math.min(rewardedSingletons.length, CONFIG.maxLives - state.lives);
       state.lives += lifeReward;
       matchedCards.forEach((card) => { card.matched = true; });
       syncCardElements();
-      showToast(
-        `${pairCount > 1 ? `${pairCount}ペア・コンボ！ +${earned}` : `1ペア！ +${earned}`}${lifeReward > 0 ? ` / ボーナス +${lifeReward} LIFE` : ''}`,
-        'success'
-      );
+      const parts = [pairCount > 1 ? `${pairCount}ペア・コンボ！ +${earned}` : `1ペア！ +${earned}`];
+      if (comboRecovery > 0) parts.push(`コンボ${state.combo} +${comboRecovery} LIFE`);
+      if (lifeReward > 0) parts.push(`ボーナス +${lifeReward} LIFE`);
+      showToast(parts.join(' / '), 'success');
     } else {
+      state.combo = 0;
       state.lives -= 1;
       lifeReward = Math.min(rewardedSingletons.length, CONFIG.maxLives - state.lives);
       state.lives += lifeReward;
@@ -619,8 +662,9 @@
       element.classList.toggle('is-face-up', card.faceUp);
       element.classList.toggle('is-matched', card.matched);
       element.classList.toggle('is-newly-flipped', card.newlyFlipped);
-      element.classList.toggle('is-disabled', state.phase !== 'action' || card.faceUp || card.matched);
-      element.disabled = state.phase !== 'action' || card.faceUp || card.matched;
+      const interactable = state.phase === 'action' || state.phase === 'peeking';
+      element.classList.toggle('is-disabled', !interactable || card.faceUp || card.matched);
+      element.disabled = !interactable || card.faceUp || card.matched;
       element.setAttribute('aria-label', card.faceUp ? `表向き: ${card.rank}${SUIT_ICONS[card.suit]}` : '裏向きのカード');
     });
   }
@@ -631,6 +675,7 @@
     els.lifeValue.textContent = String(state.lives);
     els.energyValue.textContent = `${state.energy} / ${CONFIG.maxEnergy}`;
     els.scoreValue.textContent = String(state.score);
+    if (els.comboValue) els.comboValue.textContent = String(state.combo);
 
     const skill1 = CONFIG.skills[state.equipped[0]];
     const skill2 = CONFIG.skills[state.equipped[1]];
@@ -639,10 +684,19 @@
     els.slot1Summary.classList.toggle('is-active', state.phase === 'action' && state.actionIndex === 0);
     els.slot2Summary.classList.toggle('is-active', state.phase === 'action' && state.actionIndex === 1);
 
+    if (els.passButton) {
+      const canPass = state.phase === 'action' && state.actionIndex === 0;
+      els.passButton.hidden = !canPass;
+      els.passButton.disabled = !canPass || state.lives <= CONFIG.passLifeCost;
+    }
+
     if (state.phase === 'action') {
       const activeSkill = CONFIG.skills[state.equipped[state.actionIndex]];
       els.phaseLabel.textContent = `アクションフェイズ — FLIP ${state.actionIndex + 1}`;
       els.actionPrompt.textContent = `${activeSkill.name}: 対象の裏向きカードを選んでください`;
+    } else if (state.phase === 'peeking') {
+      els.phaseLabel.textContent = '様子見フェイズ';
+      els.actionPrompt.textContent = '確認したいカードを1枚選んでください（判定は行われません）';
     } else if (state.phase === 'resolving') {
       els.phaseLabel.textContent = '判定フェイズ';
       els.actionPrompt.textContent = '表向きのカードからペアを判定しています';
@@ -752,6 +806,7 @@
   }
 
   els.startRoundButton.addEventListener('click', startRound);
+  if (els.passButton) els.passButton.addEventListener('click', handlePassClick);
   els.slot1Select.addEventListener('change', () => syncLoadoutSelectRestrictions(0));
   els.slot2Select.addEventListener('change', () => syncLoadoutSelectRestrictions(1));
   els.skipRewardButton.addEventListener('click', () => {

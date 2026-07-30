@@ -21,6 +21,7 @@
         <div class="stat"><span>LIFE</span><strong id="lifeValue">20</strong></div>
         <div class="stat"><span>ENERGY</span><strong id="energyValue">3 / 3</strong></div>
         <div class="stat"><span>SCORE</span><strong id="scoreValue">0</strong></div>
+        <div class="stat"><span>COMBO</span><strong id="comboValue">0</strong></div>
       </section>
     </header>
 
@@ -41,6 +42,8 @@
           <strong>通常フリップ</strong>
         </div>
       </div>
+
+      <button class="ghost-button pass-button" id="passButton" type="button" hidden>様子見（−1 LIFEで1枚だけ確認）</button>
     </section>
 
     <section class="round-setup-panel is-open" id="roundModal" role="region" aria-labelledby="roundModalTitle">
@@ -141,12 +144,14 @@
         <li>2回のフリップ後、表向きの未処理カード全体を判定します。</li>
         <li>ペアが1組以上あれば得点。複数ペアならボーナスです。</li>
         <li>ペアにならなかったカードは、判定後に裏向きへ戻ります。</li>
-        <li>ペアがなければライフを1失います。盤面の枚数が奇数のラウンドで相方のいないカードを初めてめくると、最大20までライフを1獲得します。</li>
+        <li>ペアが成立するとコンボが1増え、コンボ数と同じ数だけライフを回復します（連続成功するほど回復量が伸びます）。失敗するとコンボは0に戻り、ライフを1失います。</li>
+        <li>盤面の枚数が奇数のラウンドで相方のいないカードを初めてめくると、最大20までライフを1獲得します。</li>
         <li>ライフが0になれば即ゲームオーバーです。</li>
         <li>裏向きカードが1枚以下になると次のラウンドへ進みます。</li>
         <li>52枚をすべて使い切るとゲームクリアです。</li>
         <li>毎ターン3エネルギーまで使えます。エネルギーは次のターンに全回復します。</li>
-        <li>特殊フリップは共通のエネルギーを消費します（ダブル1、ラッキーストライク2、パワーアタック3）。獲得した特殊フリップはなくなりません。</li>
+        <li>ターン開始時、フリップの代わりに「様子見」を選ぶこともできます。ライフを1消費する代わりに、判定なしでカードを1枚だけ確認できます（コンボは変化しません）。残りライフが1のときは使えません。</li>
+        <li>現在は特殊フリップのバランス検証中のため、通常フリップのみが使用できます。</li>
       </ol>
       <button class="primary-button" id="closeRulesButton" type="button">閉じる</button>
     </section>
