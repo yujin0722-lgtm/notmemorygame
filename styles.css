@@ -131,6 +131,17 @@ button { cursor: pointer; }
   border-color: rgba(184, 255, 115, 0.68);
   box-shadow: inset 0 0 0 1px rgba(184, 255, 115, 0.18);
 }
+.pass-button {
+  flex-shrink: 0;
+  border-color: rgba(255, 107, 114, 0.4);
+  color: #ffabb0;
+}
+.pass-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none !important;
+}
+
 .flip-slot span {
   display: block;
   color: var(--muted);
@@ -465,10 +476,11 @@ button { cursor: pointer; }
   .app-shell { grid-template-rows: auto auto auto minmax(500px, 1fr) auto; }
   .topbar { align-items: flex-start; }
   .stats { display: grid; grid-template-columns: 1fr 1fr; }
-  .stat:nth-child(2) { border-right: 0; }
-  .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .stat:nth-child(even) { border-right: 0; }
+  .stat:nth-child(-n+4) { border-bottom: 1px solid var(--line); }
   .control-panel { align-items: flex-start; flex-direction: column; }
   .loadout-summary { width: 100%; }
+  .pass-button { width: 100%; margin-top: 8px; }
   .flip-slot { flex: 1; min-width: 0; }
   .round-setup-panel { grid-template-columns: 1fr; gap: 12px; }
   .reward-grid { grid-template-columns: 1fr; }

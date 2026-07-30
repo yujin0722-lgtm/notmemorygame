@@ -16,6 +16,9 @@ window.GAME_CONFIG = {
   removeDelayMs: 650,
   toastDurationMs: 1600,
 
+  // 様子見(パス)1回あたりのライフ消費。残りライフがこれ以下の場合は使用不可。
+  passLifeCost: 1,
+
   layout: {
     minCardWidth: 48,
     maxCardWidth: 92,
@@ -60,5 +63,6 @@ window.GAME_CONFIG = {
     },
   },
 
-  rewardSkillIds: ['double', 'lucky', 'power'],
+  // 現在はバランス検証中のため、特殊フリップの報酬は一旦なし(通常フリップのみ)。
+  rewardSkillIds: [],
 };
