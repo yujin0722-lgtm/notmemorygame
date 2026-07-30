@@ -99,10 +99,10 @@
       });
     });
 
-    // ラウンド1は必ずスペードのA・クラブのAから開始する。
-    const startIndex = groups.findIndex((group) => group[0].rank === 'A' && group[0].color === 'black');
-    const startGroup = groups.splice(startIndex, 1)[0];
+    // ラウンド1は「同じ色・同じ数字」のペアからランダムに開始する。
     shuffle(groups);
+    const startGroup = groups.shift();
+    shuffle(startGroup);
 
     const drawOrder = [];
     groups.forEach((group) => {
