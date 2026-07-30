@@ -69,6 +69,7 @@
     toastTimer: null,
     deckSequence: [],
     totalRounds: 0,
+    claimedSingletons: new Set(),
   };
 
   function resetGame() {
@@ -84,13 +85,15 @@
     state.equipped = ['normal', 'normal'];
     state.pendingRewardSkill = null;
     state.deckSequence = buildDeckSequence();
-    state.totalRounds = state.deckSequence.length;
+    state.totalRounds = state.deckSequence.length - 1;
+    state.claimedSingletons = new Set();
     closeAllModals();
     prepareRound();
   }
 
   function buildDeckSequence() {
-    // 13ランク × (黒:♠♣ / 赤:♥♦) の26グループ、各2枚で52枚。
+    // 13ランク × (黒:♠♣ / 赤:♥♦) の26グループ、各2枚で52枚の固定順を作る。
+    // ラウンドNは、この列の先頭(N+1)枚を毎回まるごと配り直す。
     const groups = [];
     RANKS.forEach((rank) => {
       ['black', 'red'].forEach((colorKey) => {
@@ -104,17 +107,11 @@
     const startGroup = groups.shift();
     shuffle(startGroup);
 
-    const drawOrder = [];
+    const sequence = [...startGroup];
     groups.forEach((group) => {
       shuffle(group);
-      drawOrder.push(...group);
+      sequence.push(...group);
     });
-
-    const perRound = Math.max(1, CONFIG.newCardsPerRound || 1);
-    const sequence = [[...startGroup]];
-    for (let i = 0; i < drawOrder.length; i += perRound) {
-      sequence.push(drawOrder.slice(i, i + perRound));
-    }
     return sequence;
   }
 
@@ -126,21 +123,20 @@
     openModal(els.roundModal);
     // インラインの装備パネルを表示してから、残り領域にカードを配置します。
     void els.roundModal.offsetHeight;
-    const previousOnBoard = state.cards.filter((card) => !card.matched).length;
     buildDeck();
     renderBoard();
     populateLoadoutSelects();
-    const onBoard = state.cards.filter((card) => !card.matched).length;
-    const newCount = onBoard - previousOnBoard;
     els.roundModalTitle.textContent = `ラウンド ${state.round} / ${state.totalRounds}`;
     els.roundModalText.textContent =
-      `盤面に${onBoard}枚（今回+${newCount}枚）。使用済み ${state.cards.length} / 52 枚。`;
+      `${state.cards.length}枚のカードが配置されました（全52枚中${state.cards.length}枚）。`;
     updateUI();
   }
 
   function buildDeck() {
-    const newCardSpecs = state.deckSequence[state.round - 1] || [];
-    const newCards = newCardSpecs.map((spec) => ({
+    // 毎ラウンド、先頭(ラウンド番号+1)枚をまるごと配り直す（前ラウンドの状態は引き継がない）。
+    const count = state.round + 1;
+    const specs = state.deckSequence.slice(0, count);
+    const cards = specs.map((spec) => ({
       id: `r${state.round}-${spec.rank}${spec.suit}-${Math.random().toString(36).slice(2, 8)}`,
       rank: spec.rank,
       suit: spec.suit,
@@ -149,7 +145,6 @@
       faceUp: false,
       matched: false,
       newlyFlipped: false,
-      lifeRewardClaimed: false,
       x: 0,
       y: 0,
       width: 70,
@@ -157,7 +152,8 @@
       rotation: 0,
     }));
 
-    state.cards.push(...newCards);
+    shuffle(cards);
+    state.cards = cards;
     assignScatteredLayout();
   }
 
@@ -165,7 +161,7 @@
     const rect = els.board.getBoundingClientRect();
     const boardWidth = Math.max(rect.width, 320);
     const boardHeight = Math.max(rect.height, 460);
-    const cards = state.cards.filter((card) => !card.matched);
+    const cards = state.cards;
     const count = cards.length;
     const area = boardWidth * boardHeight;
     const estimatedWidth = Math.sqrt(area / Math.max(count * 1.9, 1)) * 0.72;
@@ -234,7 +230,7 @@
   function renderBoard() {
     els.board.querySelectorAll('.card').forEach((element) => element.remove());
 
-    state.cards.filter((card) => !card.matched).forEach((card, index) => {
+    state.cards.forEach((card, index) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'card';
@@ -364,10 +360,10 @@
     const rewardedSingletons = unmatchedCards.filter((card) => (
       card.newlyFlipped
       && singletonSymbols.has(card.symbol)
-      && !card.lifeRewardClaimed
+      && !state.claimedSingletons.has(card.symbol)
     ));
 
-    rewardedSingletons.forEach((card) => { card.lifeRewardClaimed = true; });
+    rewardedSingletons.forEach((card) => { state.claimedSingletons.add(card.symbol); });
     let lifeReward = 0;
 
     if (pairCount > 0) {

@@ -16,9 +16,6 @@ window.GAME_CONFIG = {
   removeDelayMs: 650,
   toastDurationMs: 1600,
 
-  // トランプ52枚を使い切ったらクリア。1ラウンドで追加するカード枚数（初回除く）。
-  newCardsPerRound: 1,
-
   layout: {
     minCardWidth: 48,
     maxCardWidth: 92,
