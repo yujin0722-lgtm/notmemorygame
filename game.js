@@ -8,6 +8,8 @@
   const SUIT_ICONS = { spade: '♠', club: '♣', heart: '♥', diamond: '♦' };
   const SUIT_COLORS = { spade: 'black', club: 'black', heart: 'red', diamond: 'red' };
   const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  // ラウンド1は2枚、以降は毎ラウンド5枚ずつ追加し、全11ラウンドで52枚に到達する。
+  const ROUND_SIZES = [2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52];
 
   const els = {
     board: $('#board'),
@@ -87,7 +89,7 @@
     state.equipped = ['normal', 'normal'];
     state.pendingRewardSkill = null;
     state.deckSequence = buildDeckSequence();
-    state.totalRounds = state.deckSequence.length - 1;
+    state.totalRounds = ROUND_SIZES.length;
     state.combo = 0;
     closeAllModals();
     prepareRound();
@@ -95,9 +97,15 @@
 
   function buildDeckSequence() {
     // 13ランク×4スートの52枚。本来の神経衰弱と同じく、同じ数字ならスート・色を問わずペアになる。
-    // 「常に1ランクだけが導入途中(奇数枚)になる」という制約だけを守り、
-    // どのランクをいつ導入・再開するかはランダムに決める（毎回同じランクを続けて
-    // 導入するような不要な規則性を作らないため）。
+    // ラウンド1は開始ペア(2枚)、以降は毎ラウンド5枚ずつ(新規ペア2組+単独カード1枚、または
+    // 前ラウンドの単独カードの解消+新規ペア2組)を追加し、全11ラウンドで52枚に到達する。
+    //
+    // 「奇数枚(単独カードが存在する)ランクは常に0か1つだけ」という制約は、盤面枚数の偶奇が
+    // 毎ラウンド機械的に反転するため必ず守る必要がある(2ランク以上が同時に単独になると、
+    // 異なる数字同士は絶対にペアにならず、ラウンドが終了不能になるため)。
+    // そのため単独カードの解消は必ず次ラウンドで行われる。ランダム性は「新規ペア」枠が
+    // 新規ランクを開始するか、温めていたランク(2/4導入済み)を完成させるかの選択、および
+    // 「単独」枠が新規ランクを開始するか、温めていたランクを奇数にするかの選択に持たせている。
     const suitPools = {};
     RANKS.forEach((rank) => { suitPools[rank] = shuffle([...SUITS]); });
     const drawnCount = {};
@@ -110,36 +118,60 @@
       drawnCount[rank] += 1;
     };
 
-    const ranks = shuffle([...RANKS]);
-    const startRank = ranks.shift();
+    let notStarted = shuffle([...RANKS]); // 0/4枚(まだ手つかず)のランク
+    let paired = []; // 2/4枚導入済み(すでに1組ペアが場にある、残り2枚待ち)のランク
+    let pendingRank = null; // 奇数枚(1 or 3)のまま残っている、次ラウンドで解消待ちのランク
+
+    const startRank = notStarted.splice(Math.floor(Math.random() * notStarted.length), 1)[0];
     draw(startRank);
     draw(startRank); // ラウンド1: 開始ペア(同じランクの2枚)。
+    paired.push(startRank);
 
-    let twoIntroduced = [startRank]; // 2/4枚導入済み(偶数、続きを引ける)ランク
-    let notStarted = ranks; // 0/4枚(まだ手つかず)のランク
-    let pendingRank = null; // 奇数枚(1 or 3)のまま残っている、解消待ちのランク
-
-    while (sequence.length < 52) {
-      if (pendingRank) {
-        draw(pendingRank);
-        if (drawnCount[pendingRank] === 2) twoIntroduced.push(pendingRank);
-        // drawnCount===4になった場合は完了なので、どちらのプールにも戻さない。
-        pendingRank = null;
-        continue;
+    const pickPairSlot = () => {
+      const canFresh = notStarted.length > 0;
+      const canComplete = paired.length > 0;
+      const chooseFresh = canFresh && (!canComplete || Math.random() < 0.5);
+      if (chooseFresh) {
+        const index = Math.floor(Math.random() * notStarted.length);
+        const rank = notStarted.splice(index, 1)[0];
+        draw(rank);
+        draw(rank);
+        paired.push(rank);
+      } else {
+        const index = Math.floor(Math.random() * paired.length);
+        const rank = paired.splice(index, 1)[0];
+        draw(rank);
+        draw(rank);
       }
+    };
 
-      const canStartNew = notStarted.length > 0;
-      const canContinue = twoIntroduced.length > 0;
-      const chooseNew = canStartNew && (!canContinue || Math.random() < 0.5);
-
-      if (chooseNew) {
+    const pickSingleSlot = () => {
+      const canFresh = notStarted.length > 0;
+      const canBump = paired.length > 0;
+      const chooseFresh = canFresh && (!canBump || Math.random() < 0.5);
+      if (chooseFresh) {
         const index = Math.floor(Math.random() * notStarted.length);
         pendingRank = notStarted.splice(index, 1)[0];
       } else {
-        const index = Math.floor(Math.random() * twoIntroduced.length);
-        pendingRank = twoIntroduced.splice(index, 1)[0];
+        const index = Math.floor(Math.random() * paired.length);
+        pendingRank = paired.splice(index, 1)[0];
       }
       draw(pendingRank);
+    };
+
+    for (let round = 2; round <= ROUND_SIZES.length; round += 1) {
+      if (pendingRank) {
+        draw(pendingRank);
+        if (drawnCount[pendingRank] === 2) paired.push(pendingRank);
+        // drawnCount===4になった場合は完了なので、どちらのプールにも戻さない。
+        pendingRank = null;
+      }
+
+      pickPairSlot();
+      pickPairSlot();
+
+      const isEvenRound = round % 2 === 0;
+      if (isEvenRound) pickSingleSlot();
     }
 
     return sequence;
@@ -163,8 +195,8 @@
   }
 
   function buildDeck() {
-    // 毎ラウンド、先頭(ラウンド番号+1)枚をまるごと配り直す（前ラウンドの状態は引き継がない）。
-    const count = state.round + 1;
+    // 毎ラウンド、そのラウンドまでの累計枚数分をまるごと配り直す（前ラウンドの状態は引き継がない）。
+    const count = ROUND_SIZES[state.round - 1];
     const specs = state.deckSequence.slice(0, count);
     const cards = specs.map((spec) => ({
       id: `r${state.round}-${spec.rank}${spec.suit}-${Math.random().toString(36).slice(2, 8)}`,
