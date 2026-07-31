@@ -95,21 +95,52 @@
 
   function buildDeckSequence() {
     // 13ランク×4スートの52枚。本来の神経衰弱と同じく、同じ数字ならスート・色を問わずペアになる。
-    // 各ランクの4枚は「1枚ずつ導入し、常に1ランクだけが導入途中(奇数枚)になる」順で並べる。
-    // これにより、どのラウンドでも「相方候補が1枚もないカード」は常に0〜1枚に保たれ、
-    // ラウンドが終了不能になることがない。
-    const suitsFor = (rank) => shuffle([...SUITS]).map((suit) => ({ rank, suit, color: SUIT_COLORS[suit] }));
+    // 「常に1ランクだけが導入途中(奇数枚)になる」という制約だけを守り、
+    // どのランクをいつ導入・再開するかはランダムに決める（毎回同じランクを続けて
+    // 導入するような不要な規則性を作らないため）。
+    const suitPools = {};
+    RANKS.forEach((rank) => { suitPools[rank] = shuffle([...SUITS]); });
+    const drawnCount = {};
+    RANKS.forEach((rank) => { drawnCount[rank] = 0; });
+
+    const sequence = [];
+    const draw = (rank) => {
+      const suit = suitPools[rank].shift();
+      sequence.push({ rank, suit, color: SUIT_COLORS[suit] });
+      drawnCount[rank] += 1;
+    };
 
     const ranks = shuffle([...RANKS]);
     const startRank = ranks.shift();
-    const startSuits = suitsFor(startRank);
+    draw(startRank);
+    draw(startRank); // ラウンド1: 開始ペア(同じランクの2枚)。
 
-    // ラウンド1: 開始ペア(2枚)。ラウンド2・3: 同じランクの残り2枚を1枚ずつ。
-    const sequence = [startSuits[0], startSuits[1], startSuits[2], startSuits[3]];
+    let twoIntroduced = [startRank]; // 2/4枚導入済み(偶数、続きを引ける)ランク
+    let notStarted = ranks; // 0/4枚(まだ手つかず)のランク
+    let pendingRank = null; // 奇数枚(1 or 3)のまま残っている、解消待ちのランク
 
-    ranks.forEach((rank) => {
-      sequence.push(...suitsFor(rank));
-    });
+    while (sequence.length < 52) {
+      if (pendingRank) {
+        draw(pendingRank);
+        if (drawnCount[pendingRank] === 2) twoIntroduced.push(pendingRank);
+        // drawnCount===4になった場合は完了なので、どちらのプールにも戻さない。
+        pendingRank = null;
+        continue;
+      }
+
+      const canStartNew = notStarted.length > 0;
+      const canContinue = twoIntroduced.length > 0;
+      const chooseNew = canStartNew && (!canContinue || Math.random() < 0.5);
+
+      if (chooseNew) {
+        const index = Math.floor(Math.random() * notStarted.length);
+        pendingRank = notStarted.splice(index, 1)[0];
+      } else {
+        const index = Math.floor(Math.random() * twoIntroduced.length);
+        pendingRank = twoIntroduced.splice(index, 1)[0];
+      }
+      draw(pendingRank);
+    }
 
     return sequence;
   }
