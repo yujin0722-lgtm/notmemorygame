@@ -130,7 +130,10 @@
     const pickPairSlot = () => {
       const canFresh = notStarted.length > 0;
       const canComplete = paired.length > 0;
-      const chooseFresh = canFresh && (!canComplete || Math.random() < 0.5);
+      // 手つかず・ペア済み、それぞれのランク"数"に比例した確率で選ぶ（固定50%だと、
+      // 数が少ない側のランクほど優先的に選ばれてしまい偏りが出るため）。
+      const chooseFresh = canFresh
+        && (!canComplete || Math.random() < notStarted.length / (notStarted.length + paired.length));
       if (chooseFresh) {
         const index = Math.floor(Math.random() * notStarted.length);
         const rank = notStarted.splice(index, 1)[0];
@@ -148,7 +151,9 @@
     const pickSingleSlot = () => {
       const canFresh = notStarted.length > 0;
       const canBump = paired.length > 0;
-      const chooseFresh = canFresh && (!canBump || Math.random() < 0.5);
+      // pickPairSlotと同様、ランク数に比例した確率で選ぶ。
+      const chooseFresh = canFresh
+        && (!canBump || Math.random() < notStarted.length / (notStarted.length + paired.length));
       if (chooseFresh) {
         const index = Math.floor(Math.random() * notStarted.length);
         pendingRank = notStarted.splice(index, 1)[0];
