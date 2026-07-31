@@ -6,7 +6,8 @@
  */
 window.GAME_CONFIG = {
   initialLives: 20,
-  maxLives: 20,
+  // プレイテスト中：ライフに上限を設けない（コンボ回復が青天井で貯蓄できる仕様を確認するため）。
+  maxLives: Infinity,
   maxEnergy: 3,
   inventoryLimit: 4,
   rewardEveryRounds: 2,
@@ -18,6 +19,8 @@ window.GAME_CONFIG = {
 
   // 様子見(パス)1回あたりのライフ消費。残りライフがこれ以下の場合は使用不可。
   passLifeCost: 1,
+  // プレイテスト中：コンボ回復単体の手触りを確認するため、様子見(パス)を一時的に使用不可にする。
+  passEnabled: false,
 
   layout: {
     minCardWidth: 48,
