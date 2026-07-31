@@ -422,7 +422,7 @@
       const earned = CONFIG.pairBaseScore * pairCount * pairCount;
       state.score += earned;
       state.combo += 1;
-      const comboRecovery = Math.min(state.combo, CONFIG.maxLives - state.lives);
+      const comboRecovery = Math.min(state.combo - 1, CONFIG.maxLives - state.lives);
       state.lives += comboRecovery;
       matchedCards.forEach((card) => { card.matched = true; });
       syncCardElements();
