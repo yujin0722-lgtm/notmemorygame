@@ -295,6 +295,7 @@
   }
 
   function handlePassClick() {
+    if (!CONFIG.passEnabled) return;
     if (state.phase !== 'action' || state.actionIndex !== 0) return;
     if (state.lives <= CONFIG.passLifeCost) {
       showToast('ライフが足りないため様子見できません', 'danger');
@@ -690,8 +691,8 @@
     els.slot2Summary.classList.toggle('is-active', state.phase === 'action' && state.actionIndex === 1);
 
     if (els.passButton) {
-      const canPass = state.phase === 'action' && state.actionIndex === 0;
-      els.passButton.hidden = !canPass;
+      const canPass = CONFIG.passEnabled && state.phase === 'action' && state.actionIndex === 0;
+      els.passButton.hidden = !CONFIG.passEnabled || !canPass;
       els.passButton.disabled = !canPass || state.lives <= CONFIG.passLifeCost;
     }
 
